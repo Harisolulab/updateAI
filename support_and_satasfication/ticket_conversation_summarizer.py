@@ -31,19 +31,7 @@ def generate_ticket_summary(conversation_thread: str) -> str:
     return response.content.strip()
 
  
-if __name__ == "__main__":
-    long_conversation = """
-    Customer: Hi, I have an issue with my recent order #1234. The my ticket damaged.
-    Support: I'm sorry to hear that. Can you please provide a photo of the damage?
-    Customer: Sure, attaching the photo now.
-    Support: Thank you. We will initiate a replacement immediately.
-    Customer: Appreciate the quick response.
-    Support: The replacement will be shipped within 2 business days.
-    Customer: Thanks, that's great.
-    """
-    summary = generate_ticket_summary(long_conversation)
-    print("Markdown Summary for Dashboard:\n")
-    print(summary)
+
 
 
 
