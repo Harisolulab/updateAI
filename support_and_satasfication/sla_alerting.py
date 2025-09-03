@@ -130,5 +130,4 @@ def check_sla_and_alert():
 
 
 
-if __name__ == "__main__":
-    check_sla_and_alert()
+
