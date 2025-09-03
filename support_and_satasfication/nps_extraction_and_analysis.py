@@ -85,19 +85,3 @@ def process_surveys(surveys: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         })
     return processed_results
 
-# Example run (replace with real data or integration)
-if __name__ == "__main__":
-    example_surveys = [
-        {
-            "response_text": "How likely are you to recommend us to a friend? 9\nComments: Excellent service and quick response.",
-            "feedback": "Excellent service and quick response."
-        },
-        {
-            "image_path": "path/to/scanned_survey_1.png",
-            "feedback": "The delivery was late and customer service was slow."
-        }
-    ]
-
-    results = process_surveys(example_surveys)
-    for r in results:
-        print(r)
