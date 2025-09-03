@@ -53,18 +53,3 @@ def detect_sensitive_terms(text: str) -> Dict:
         "redacted_text": redacted_text,
         "is_flagged": bool(all_sensitive),
     }
-
-
-# Example usage
-if __name__ == "__main__":
-    sample_text = (
-        "Hello, I want to file a data deletion request under GDPR. "
-        "Please remove my personal data. Contact my lawyer at Acme Corp."
-    )
-
-    result = detect_sensitive_terms(sample_text)
-
-    print("Sensitive Terms Detected:", result["flagged_terms"])
-    print("Named Entities:", result["entities"])
-    print("Redacted Text:", result["redacted_text"])
-    print("Flagged (Compliance Alert):", result["is_flagged"])
