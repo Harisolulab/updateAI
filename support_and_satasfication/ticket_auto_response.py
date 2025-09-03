@@ -15,13 +15,7 @@ api_key = os.getenv("your_openai_key")
 # Initialize GPT-4o chat model with API key
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
 # Prepare FAQ and historical ticket data (replace with your real data or database)
-faq_texts = [
-    {"question": "What is the status of my order?", "answer": "You can track your order using the tracking link emailed to you."},
-    {"question": "How do I return an item?", "answer": "Returns are accepted within 30 days via our returns portal."},
-    {"question": "What shipping options do you offer?", "answer": "We offer standard, expedited, and overnight shipping options."},
-    {"question": "How can I update my account details?", "answer": "Log in and go to 'Account Settings' to update your details."},
-    {"question": "What is the product warranty?", "answer": "Most products come with a one-year warranty. Check specific terms per product."},
-]
+faq_texts = "enter your real data"
 
 # Prepare documents for vector store
 docs = [f"Q: {faq['question']}\nA: {faq['answer']}" for faq in faq_texts]
@@ -82,19 +76,5 @@ Answer:
 """
     response = llm.invoke([SystemMessage(content=prompt), HumanMessage(content=user_query)])
     return response.content.strip()
-# Example usage
-if __name__ == "__main__":
-    queries = [
-        "Can you update me on my order status?",
-        "How do I return an item I purchased?",
-        "What shipping methods are available?",
-        "I want to know about product warranty.",
-        "How do I change my account info?",
-        "What is your refund policy?",
-    ]
-    for q in queries:
-        print(f"User: {q}")
-        print("AI:", generate_response(q))
-        print("-" * 40)
 
 
