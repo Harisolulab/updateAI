@@ -116,25 +116,3 @@ def calculate_churn_risk(timestamps, sentiment_scores, messages):
     )
     return min(max(churn_score, 0.0), 1.0)
 
-# Example usage:
-if __name__ == "__main__":
-    import datetime
-    
-    timestamps = [
-        datetime.datetime(2025, 8, 20, 15, 0, 0),
-        datetime.datetime(2025, 8, 20, 15, 1, 30),
-        datetime.datetime(2025, 8, 20, 15, 10, 10),  # Long gap
-        datetime.datetime(2025, 8, 20, 15, 11, 0)
-    ]
-    sentiment_scores = [0.6, 0.5, 0.2, -0.1]
-    messages = [
-        "How do I reset my password?",
-        "I want to reset my password.",
-        "I still can't reset my password, need help!",
-        "Why no one is responding?"
-    ]
-    
-    churn_risk = calculate_churn_risk(timestamps, sentiment_scores, messages)
-    print(f"Churn Risk Score: {churn_risk:.2f}")
-    if churn_risk > 0.7:
-        print("!!! High churn risk detected! Escalate to agent.")
