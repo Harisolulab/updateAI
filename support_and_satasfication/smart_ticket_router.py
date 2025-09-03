@@ -56,21 +56,4 @@ def route_ticket(summary, top_category, complexity):
     print(f"Routing ticket: {summary} -> {assigned} ({top_category}, {complexity})")
     return assigned
 
-if __name__ == "__main__":
-    ticket_texts = [
-        "I tried to reset my password, but the reset link doesn't work. Can someone help me access my account?",
-        "My order arrived late and was damaged. I need to return it and get a refund.",
-        "How do I update my payment method for automatic billing?",
-        "I am unable to connect my device to Wi-Fi and keep getting error code 3002.",
-        """The new update crashed my software, and now I can't generate any reports. I've tried reinstalling, but nothing works.
-        I've spent hours troubleshooting. This is seriously impacting my business operations and I need urgent support."""
-    ]
-    for idx, text in enumerate(ticket_texts, 1):
-        print(f"\n--- Ticket #{idx} ---")
-        summary = summarize_ticket(text)
-        top_category, complexity, labels, scores = classify_ticket(summary)
-        agent = route_ticket(summary, top_category, complexity)
-        print(f"Summary: {summary}")
-        print(f"Category: {top_category} | Complexity: {complexity}")
-        print(f"Routed to: {agent}")
-        print("-" * 40)
+
