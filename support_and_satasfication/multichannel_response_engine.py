@@ -98,18 +98,4 @@ def dispatch_response(message, response):
     else:
         print(f"[Default] To: {sender}\nContent: {response}")
 
-if __name__ == "__main__":
-    raw_messages = [
-        {"platform": "email", "sender": "customer@example.com", "content": "Where is my order?", "metadata": {}},
-        {"platform": "whatsapp", "sender": "+33123456789", "content": "I want to change my delivery address.", "metadata": {}},
-        {"platform": "zendesk", "sender": "customer_zendesk_id", "content": "Refund not received yet.", "metadata": {"ticket_id": "ZD12345"}},
-        {"platform": "salesforce", "sender": "customer_sf_id", "content": "I need help with my account login.", "metadata": {"case_id": "SF9876"}},
-        {"platform": "chat", "sender": "customer_chat_id", "content": "Do you offer express shipping?", "metadata": {}}
-    ]
-
-    for raw in raw_messages:
-        msg = ingest_message(raw)
-        reply = generate_response(msg)
-        dispatch_response(msg, reply)
-        print("="*50)
 
