@@ -49,17 +49,3 @@ def log_failed_response(
     print(f"Logged failed response for user {user_id} at {log_entry['created_at']}")
 
 
-# Example Usage
-if __name__ == "__main__":
-    dummy_input = {
-        "message": "What is the status of my order?",
-        "context": {"order_id": "12345"}
-    }
-    dummy_error = "Model failed to generate response - timeout"
-
-    log_failed_response(
-        user_id="user_abc_123",
-        input_data=dummy_input,
-        error_details=dummy_error,
-        escalation=True
-    )
