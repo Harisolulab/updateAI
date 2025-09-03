@@ -19,17 +19,3 @@ def tag_emotions_in_chat(message: str):
     emotions = {item['label']: item['score'] for item in results[0]}
     return emotions
 
-
-# Logging or tagging example
-if __name__ == "__main__":
-    chat_message = "I'm really upset about the delay and this is unacceptable!"
-    emotion_scores = tag_emotions_in_chat(chat_message)
-
-    print("Chat message:", chat_message)
-    print("Emotion scores:")
-    for emotion, score in emotion_scores.items():
-        print(f" - {emotion}: {score:.3f}")
-
-    # You can apply logic here: if anger or sadness > threshold, escalate/log for training
-    if emotion_scores.get("anger", 0) > 0.5 or emotion_scores.get("sadness", 0) > 0.5:
-        print("Flagged for escalation or training.")
