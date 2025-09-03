@@ -53,9 +53,3 @@ def live_sentiment_agent(state: dict) -> dict:
     state["urgent_emotion"] = sentiment.get("urgent_emotion", False)
     return state
 
-# Example usage
-if __name__ == "__main__":
-    state = {"raw_message": "I'm upset! The product broke after one day and your support hasn't replied."}
-    print("Before:", state)
-    updated = live_sentiment_agent(state)
-    print("After:", updated)
