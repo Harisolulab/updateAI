@@ -1,1 +1,205 @@
+import os
+import time
+import logging
+from typing import Optional, Dict, Any, Tuple
+from authlib.integrations.requests_client import OAuth2Session
+
+logger = logging.getLogger("JARVIS.OAuth2")
+
+# OAuth2 provider configurations - use environment variables for secrets
+OAUTH_PROVIDERS = {
+    "slack": {
+        "authorize_url": "https://slack.com/oauth/v2/authorize",
+        "token_url": "https://slack.com/api/oauth.v2.access",
+        "client_id": os.getenv("SLACK_CLIENT_ID"),
+        "client_secret": os.getenv("SLACK_CLIENT_SECRET"),
+        "scope": "channels:read,chat:write,users:read",
+        "redirect_uri": os.getenv("SLACK_REDIRECT_URI"),
+        "use_pkce": True
+    },
+    "microsoft": {
+        "authorize_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+        "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "client_id": os.getenv("MS_CLIENT_ID"),
+        "client_secret": os.getenv("MS_CLIENT_SECRET"),
+        "scope": "User.Read openid offline_access",
+        "redirect_uri": os.getenv("MS_REDIRECT_URI"),
+        "use_pkce": True
+    },
+    "gmail": {
+        "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+        "scope": "https://gmail.googleapis.com/auth/gmail.readonly openid email profile offline_access",
+        "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
+        "use_pkce": True
+    },
+    "notion": {
+        "authorize_url": "https://api.notion.com/v1/oauth/authorize",
+        "token_url": "https://api.notion.com/v1/oauth/token",
+        "client_id": os.getenv("NOTION_CLIENT_ID"),
+        "client_secret": os.getenv("NOTION_CLIENT_SECRET"),
+        "scope": "database.read content.read",
+        "redirect_uri": os.getenv("NOTION_REDIRECT_URI"),
+        "use_pkce": False  # Notion does not support PKCE
+    }
+}
+
+##############################################
+# Simple secure-ish in-memory storage backend #
+##############################################
+# In production, replace with a durable store (e.g., Redis/DB/KMS-backed) and
+# encrypt at rest. This module exposes small helpers so the storage can be
+# swapped without changing call-sites.
+
+_CODE_VERIFIER_STORE: Dict[Tuple[str, str], Tuple[str, float]] = {}
+_TOKEN_STORE: Dict[Tuple[str, str], Dict[str, Any]] = {}
+_CODE_VERIFIER_TTL_SECONDS = int(os.getenv("OAUTH_CODE_VERIFIER_TTL", "900"))  # 15 minutes
+
+def _store_code_verifier(user_id: str, provider: str, code_verifier: str) -> None:
+    _CODE_VERIFIER_STORE[(user_id, provider)] = (code_verifier, time.time() + _CODE_VERIFIER_TTL_SECONDS)
+
+def _get_code_verifier(user_id: str, provider: str) -> Optional[str]:
+    entry = _CODE_VERIFIER_STORE.get((user_id, provider))
+    if not entry:
+        return None
+    verifier, expires_at = entry
+    if time.time() > expires_at:
+        _CODE_VERIFIER_STORE.pop((user_id, provider), None)
+        return None
+    # one-time use
+    _CODE_VERIFIER_STORE.pop((user_id, provider), None)
+    return verifier
+
+def _store_token(user_id: str, provider: str, token: Dict[str, Any]) -> None:
+    # Normalize token structure and compute absolute expiry
+    token = dict(token or {})
+    if token.get("expires_in") and not token.get("expires_at"):
+        try:
+            token["expires_at"] = time.time() + float(token["expires_in"])
+        except Exception:
+            pass
+    _TOKEN_STORE[(user_id, provider)] = token
+
+def _get_token(user_id: str, provider: str) -> Optional[Dict[str, Any]]:
+    tok = _TOKEN_STORE.get((user_id, provider))
+    return dict(tok) if tok else None
+
+def _update_token(token: Dict[str, Any], refresh_token: Optional[str] = None, access_token: Optional[str] = None) -> None:
+    # This callback signature is used by Authlib. We cannot know user/provider here,
+    # so this function is typically wrapped. For our usage we update inside refresh.
+    pass
+
+def _delete_token(user_id: str, provider: str) -> None:
+    _TOKEN_STORE.pop((user_id, provider), None)
+
+
+def create_oauth_session(provider: str, token: Optional[Dict[str, Any]] = None, update_token_cb: Optional[callable] = None) -> OAuth2Session:
+    config = OAUTH_PROVIDERS[provider]
+    session = OAuth2Session(
+        client_id=config["client_id"],
+        client_secret=config["client_secret"],
+        scope=config["scope"],
+        redirect_uri=config["redirect_uri"],
+        code_challenge_method="S256" if config.get("use_pkce") else None,
+        update_token=update_token_cb
+    )
+    if token:
+        session.token = token
+    return session
+
+def initiate_oauth_flow(provider: str, user_id: str, state: Optional[str] = None) -> str:
+    """
+    Initiate PKCE OAuth2 authorization flow and return authorization URL.
+    Store code_verifier securely tied to user_id for later token exchange.
+    """
+    config = OAUTH_PROVIDERS[provider]
+    session = create_oauth_session(provider)
+
+    extra = {}
+    if config.get("use_pkce"):
+        code_verifier = OAuth2Session.generate_code_verifier()
+        code_challenge = OAuth2Session.get_code_challenge(code_verifier)
+        extra["code_challenge"] = code_challenge
+        extra["code_challenge_method"] = "S256"
+        # Store code_verifier securely for user_id + provider (e.g., in DB/cache)
+        _store_code_verifier(user_id, provider, code_verifier)
+    else:
+        code_verifier = None
+
+    auth_url, _ = session.create_authorization_url(config["authorize_url"], state=state, **extra)
+    logger.info(f"OAuth2 authorization URL generated for {provider} user {user_id}")
+    return auth_url
+
+def complete_oauth_flow(provider: str, user_id: str, code: str, state: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Complete OAuth2 flow: exchange authorization code for tokens.
+    Use stored PKCE code_verifier if applicable.
+    """
+    config = OAUTH_PROVIDERS[provider]
+    code_verifier = None
+    if config.get("use_pkce"):
+        code_verifier = _get_code_verifier(user_id, provider)
+        if not code_verifier:
+            raise ValueError("Missing code verifier for PKCE flow.")
+
+    session = create_oauth_session(provider)
+    kwargs = {}
+    if code_verifier:
+        kwargs["code_verifier"] = code_verifier
+
+    token = session.fetch_token(
+        config["token_url"],
+        code=code,
+        client_secret=config["client_secret"],
+        grant_type="authorization_code",
+        **kwargs
+    )
+    logger.info(f"OAuth2 token received for {provider} user {user_id}")
+    # Store token securely tied to user_id + provider (DB/cache)
+    _store_token(user_id, provider, token)
+    return token
+
+def refresh_access_token(provider: str, user_id: str) -> Dict[str, Any]:
+    """
+    Refresh the OAuth2 access token using stored refresh token.
+    """
+    token = _get_token(user_id, provider)
+    if not token or "refresh_token" not in token:
+        raise ValueError("No refresh token available")
+
+    session = create_oauth_session(provider, token=token, update_token_cb=_update_token)
+    new_token = session.refresh_token(OAUTH_PROVIDERS[provider]["token_url"], refresh_token=token["refresh_token"])
+    logger.info(f"OAuth2 token refreshed for {provider} user {user_id}")
+    _store_token(user_id, provider, new_token)
+    return new_token
+
+def revoke_access_token(provider: str, user_id: str) -> bool:
+    """
+    Revoke the OAuth2 token if provider supports revocation.
+    """
+    token = _get_token(user_id, provider)
+    if not token or "access_token" not in token:
+        raise ValueError("No access token found to revoke")
+
+    revoke_urls = {
+        "slack": "https://slack.com/api/auth.revoke",
+        "microsoft": "https://login.microsoftonline.com/common/oauth2/v2.0/logout",
+        "gmail": "https://oauth2.googleapis.com/revoke",
+    }
+    revoke_url = revoke_urls.get(provider)
+    if not revoke_url:
+        logger.warning(f"Revoke not supported for {provider}")
+        return False
+
+    session = create_oauth_session(provider, token=token)
+    response = session.post(revoke_url, data={"token": token["access_token"]})
+    if response.status_code in [200, 204]:
+        logger.info(f"Token revoked for {provider} user {user_id}")
+        _delete_token(user_id, provider)
+        return True
+    logger.error(f"Failed revoke token for {provider} user {user_id}: {response.text}")
+    return False
+
 
